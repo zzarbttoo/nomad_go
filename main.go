@@ -2,24 +2,28 @@ package main
 
 import (
 	"fmt"
-	"log"
 
-	"github.com/zzarbttoo/learngo/accounts"
+	"github.com/zzarbttoo/learngo/mydict"
 )
 
 func main() {
 
-	account := accounts.NewAccount("zzarbttoo")
-	account.Deposit(10)
-	fmt.Println(account.Balance())
+	dictionary := mydict.Dictionary{}
+	word := "hello"
+	definition := "Greeting"
 
-	err := account.Withdraw(20)
+	err := dictionary.Add(word, definition)
 
 	if err != nil {
-
-		//프로그램 종료
-		log.Fatalln(err)
+		fmt.Println(err)
 	}
-	fmt.Println(account.Balance())
+
+	hello, _ := dictionary.Search(word)
+	fmt.Println("found", word, "definition:", hello)
+	err2 := dictionary.Add(word, definition)
+
+	if err2 != nil {
+		fmt.Println(err2)
+	}
 
 }

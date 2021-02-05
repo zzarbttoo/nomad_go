@@ -54,3 +54,22 @@ func (a *Account) Withdraw(amount int) error {
 	return nil
 
 }
+
+// ChangeOwner of the account
+func (a *Account) ChangeOwner(newOwner string) {
+
+	a.owner = newOwner
+
+}
+
+func (a Account) Owner() string {
+
+	return a.owner
+}
+
+//Go가 자동으로 호출
+func (a Account) String() string {
+
+	return fmt.Sprint(a.owner, "'s account. \n Has", a.Balance())
+
+}
