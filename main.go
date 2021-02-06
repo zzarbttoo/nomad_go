@@ -1,52 +1,61 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 
-	"github.com/zzarbttoo/learngo/mydict"
+	"net/http"
 )
+
+var errRequestFaild = errors.New("Request failed")
 
 func main() {
 
-	dictionary := mydict.Dictionary{}
-	baseWord := "hello"
-	definition := "First"
+	var results = make(map[string]string)
 
-	//새로운 단어 추가
-	dictionary.Add(baseWord, definition)
-	dictionary.Search(baseWord)
-	dictionary.Delete(baseWord)
-	word, err := dictionary.Search(baseWord)
+	urls := []string{
 
-	if err != nil {
+		"https://nomadcoders.co/",
+		"https://www.naver.com/",
+		"https://www.google.com/",
+		"https://www.youtube.com/",
+		"https://github.com/",
+		"https://www.amazon.com/",
+	}
 
-		fmt.Println(err)
+	results["hello"] = "Hello"
+
+	for _, url := range urls {
+
+		result := "OK"
+		err := hitURL(url)
+
+		if err != nil {
+
+			result = "FAILED"
+		}
+
+		results[url] = result
 
 	}
-	fmt.Println(word)
 
-	/*
-		updateErr := dictionary.Update("gi", "Second")
+	for url, result := range results {
+		fmt.Println(url, result)
+	}
 
-		if updateErr != nil {
-			fmt.Println(updateErr)
-		}
+}
 
-		word, _ := dictionary.Search(baseWord)
-		fmt.Println(word)
+func hitURL(url string) error {
 
-	*/
+	fmt.Println("Checking :", url)
+	resp, err := http.Get(url)
+	if err != nil || resp.StatusCode >= 400 {
 
-	//같은 단어 또 추가
-	/*
-		hello, _ := dictionary.Search(word)
-		fmt.Println("found", word, "definition:", hello)
-		err2 := dictionary.Add(word, definition)
+		fmt.Println(err, resp.StatusCode)
+		return errRequestFaild
 
-		if err2 != nil {
-			fmt.Println(err2)
-		}
+	}
 
-	*/
+	return nil
 
 }
