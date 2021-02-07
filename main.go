@@ -1,65 +1,157 @@
 package main
 
 import (
-	"errors"
+	"encoding/csv"
 	"fmt"
+	"log"
 	"net/http"
+	"os"
+	"strconv"
+	"strings"
+
+	"github.com/PuerkitoBio/goquery"
 )
 
-var errRequestFaild = errors.New("Request failed")
-
-type requestResult struct {
-	url    string
-	status string
+type extractedJob struct {
+	id       string
+	title    string
+	location string
+	salary   string
+	summary  string
 }
+
+var baseURL string = "https://kr.indeed.com/jobs?q=python&limit=50"
 
 func main() {
 
-	results := make(map[string]string)
-	channel := make(chan requestResult)
+	var jobs []extractedJob
+	totalPages := getPages()
+	//fmt.Println(totalPages)
 
-	urls := []string{
+	for i := 0; i < totalPages; i++ {
 
-		"https://nomadcoders.co/",
-		"https://www.naver.com/",
-		"https://www.google.com/",
-		"https://www.youtube.com/",
-		"https://github.com/",
-		"https://www.amazon.com/",
+		extractedJob := getPage(i)
+		jobs = append(jobs, extractedJob...)
 	}
 
-	for _, url := range urls {
+	writeJobs(jobs)
 
-		go hitURL(url, channel)
-	}
+	fmt.Println("Done, extracted :", len(jobs))
 
-	//receiving message
+}
 
-	for i := 0; i < len(urls); i++ {
-		result := <-channel
-		results[result.url] = result.status
-	}
+func writeJobs(jobs []extractedJob) {
 
-	for url, status := range results {
-		fmt.Println(url, status)
+	file, err := os.Create("jobs.csv")
+	checkErr(err)
+
+	w := csv.NewWriter(file)
+	defer w.Flush()
+
+	headers := []string{"ID", "TITLE", "LOCATION", "SALARY", "SUMMARY"}
+	wErr := w.Write(headers)
+	checkErr(wErr)
+
+	for _, job := range jobs {
+		jobSlice := []string{"https://kr.indeed.com/viewjob?jk=" + job.id, job.title, job.location, job.salary, job.summary}
+		jwErr := w.Write(jobSlice)
+		checkErr(jwErr)
 	}
 }
 
-//write direction
-//can only write
-func hitURL(url string, channel chan<- requestResult) {
+func getPage(page int) []extractedJob {
 
-	resp, err := http.Get(url)
-	status := "OK"
-	if err != nil || resp.StatusCode >= 400 {
+	var jobs []extractedJob
 
-		status = "FAILED"
+	//convert integer to string
+	pageURL := baseURL + "&start=" + strconv.Itoa(page*10)
+	fmt.Println("Requesting", pageURL)
+	res, err := http.Get(pageURL)
+	checkErr(err)
+	checkCode(res)
 
+	defer res.Body.Close()
+
+	doc, err := goquery.NewDocumentFromReader(res.Body)
+	checkErr(err)
+
+	searchCards := doc.Find(".jobsearch-SerpJobCard")
+	searchCards.Each(func(i int, card *goquery.Selection) {
+
+		job := extractJob(card)
+		jobs = append(jobs, job)
+
+	})
+
+	return jobs
+
+}
+
+func extractJob(card *goquery.Selection) extractedJob {
+
+	id, _ := card.Attr("data-jk")
+	//a in title
+	title := cleanString(card.Find(".title>a").Text())
+	location := cleanString(card.Find(".sjcl").Text())
+	salary := cleanString(card.Find(".salaryText").Text())
+	summary := cleanString(card.Find(".summary").Text())
+
+	return extractedJob{id: id,
+		title:    title,
+		location: location,
+		salary:   salary,
+		summary:  summary}
+}
+
+func getPages() int {
+
+	pages := 0
+	res, err := http.Get(baseURL)
+	checkErr(err)
+	checkCode(res)
+
+	//Need close IO when these function is finish
+	//prevent memory leeks
+	defer res.Body.Close()
+
+	doc, err := goquery.NewDocumentFromReader(res.Body)
+	checkErr(err)
+
+	fmt.Println(doc)
+
+	doc.Find(".pagination").Each(func(i int, s *goquery.Selection) {
+
+		//fmt.Println(s.Html())
+		//how many links in pagination
+		//fmt.Println(s.Find("a").Length())
+
+		pages = s.Find("a").Length()
+
+	})
+
+	return pages
+}
+
+func checkErr(err error) {
+
+	if err != nil {
+		log.Fatalln(err)
 	}
 
-	channel <- requestResult{url: url, status: status}
+}
 
-	// can send to the channel c<-result{}
-	// but can also recieve from channel
+func checkCode(res *http.Response) {
 
+	if res.StatusCode != 200 {
+		log.Fatalln("Request failed with Status :", res.StatusCode)
+	}
+
+}
+
+//clean the space from the side : TrimSpace
+//remove spaces inside of array: fields
+// put them all together : join
+func cleanString(str string) string {
+
+	return strings.Join(strings.Fields(strings.TrimSpace(str)), " ")
 }
